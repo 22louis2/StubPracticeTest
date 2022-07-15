@@ -18,7 +18,6 @@ namespace Viagogo
     public class Solution
     {
         static Dictionary<string, int> _cachedDistanceStore = new Dictionary<string, int>();
-        static Dictionary<string, List<Event>> _cachedClosestCityStore = new Dictionary<string, List<Event>>();
 
         static void Main(string[] args)
         {
@@ -56,33 +55,54 @@ namespace Viagogo
              * search if the data, exists in the cached storage, before making the request to the GetDistance method
              * then send the email, to the customer(s)
              */
-            List<Event> cachedClosestCityEvent = new List<Event>();
-
-            if (_cachedClosestCityStore.ContainsKey(customer.City))
-                cachedClosestCityEvent = _cachedClosestCityStore?.FirstOrDefault(x => x.Key == customer.City).Value;
-            else
-                _cachedClosestCityStore.Add(customer.City, cachedClosestCityEvent = events.OrderBy(x => GetDistance(customer.City, x.City))?.Take(5)?.ToList());
-
-            cachedClosestCityEvent.ForEach(x => AddToEmail(customer, x));
+            events.OrderBy(x => GetDistancePreCall(customer.City, x.City))?.Take(5)?.ToList()?.ForEach(x => AddToEmail(customer, x));
 
             /*
              * QUESTION 4. to solve the problem of the GetDistance method, failing, and for which we don't want the process to fail.
              * we can cache the data in a store, by using the from and to city as key, then before making a request to the 
              * GetDistance method, search if it exists as a key in the cache store.
              */
-            int getDistance = 0;
-
-            events.ForEach(x => getDistance
-            = _cachedDistanceStore.ContainsKey(x.City + customer?.City)
-            ? _cachedDistanceStore.FirstOrDefault(y => y.Key == x.City + customer?.City).Value
-            : GetDistance(customer.City, x.City)
-            );
+            events.OrderBy(x => GetDistancePreCallNotToFail(customer.City, x.City))?.Take(5)?.ToList()?.ForEach(x => AddToEmail(customer, x));
 
             /*
              * QUESTION 5. Tackling this in respect to sorting, I would order it by price, which would help determine
              * the ones to be sent to the customer, from my cached closest city event list
              */
-            cachedClosestCityEvent.OrderBy(x => GetPrice(x));
+            events.OrderBy(x => GetDistancePreCallNotToFail(customer.City, x.City))?.ThenBy(x => GetPrice(x))?
+                .Take(5)?.ToList()?.ForEach(x => AddToEmail(customer, x));
+        }
+
+        static int GetDistancePreCallNotToFail(string fromCity, string toCity)
+        {
+            try
+            {
+                string queryKey = fromCity + toCity;
+                if (fromCity == toCity)
+                    return 0;
+                if (_cachedDistanceStore.ContainsKey(queryKey))
+                    return _cachedDistanceStore.FirstOrDefault(x => x.Key == queryKey).Value;
+
+                var distance = GetDistance(fromCity, toCity);
+                _cachedDistanceStore.Add(queryKey, distance);
+                return distance;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
+        }
+
+        static int GetDistancePreCall(string fromCity, string toCity)
+        {
+            string queryKey = fromCity + toCity;
+            if (fromCity == toCity)
+                return 0;
+            if (_cachedDistanceStore.ContainsKey(queryKey))
+                return _cachedDistanceStore.FirstOrDefault(x => x.Key == queryKey).Value;
+
+            var distance = GetDistance(fromCity, toCity);
+            _cachedDistanceStore.Add(queryKey, distance);
+            return distance;
         }
 
         // You do not need to know how these methods work
